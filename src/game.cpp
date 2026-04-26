@@ -418,8 +418,8 @@ void Game::Tick(int deltaMs)
         mLockAccumMs = 0;
     }
 
-    while (mFallAccumMs >= kWaitTimeMs && !mGameOver) {
-        mFallAccumMs -= kWaitTimeMs;
+    while (mFallAccumMs >= FallIntervalMs() && !mGameOver) {
+        mFallAccumMs -= FallIntervalMs();
 
         if (CanMoveDown()) {
             mPosY++;
