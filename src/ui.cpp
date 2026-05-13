@@ -2,6 +2,7 @@
 
 #include "piece_colors.h"
 
+#include <algorithm>
 #include <cstdio>
 
 void UI::DrawPiece(Renderer &r, const Board &board, const Pieces &pieces, int x,
@@ -68,105 +69,196 @@ void UI::DrawHud(Renderer &r, const Board &board, const Pieces &pieces,
 {
     const int screenW = r.GetScreenWidth();
 
-    const int kMargin = 12;
+    const int kMargin = 8;
     const int kGap = 10;
 
-    const int kBoxW = 120;
-    const int kScoreBoxH = 68;
-    const int kNextBoxH = 110;
-    const int kFaceBoxH = 58;
+    // HUD typography: change only this.
+    const int hudLabelPx = 16;
+    // Keep values proportional and snapped to even pixels for crisp scaling.
+    const int hudValuePx = ((hudLabelPx * 3 / 2) & ~1);
 
+    const int padX = std::max(6, hudLabelPx / 2);
+    const int topPad = std::max(4, hudLabelPx / 3);
+    const int bottomPad = topPad;
+    const int labelGap = std::max(4, hudLabelPx / 2);
+
+    // NEXT preview sizing is derived from label size (not tied to board blocks).
+    // This keeps NEXT/FACE panels compact while preserving readability.
+    int previewBlockPx = std::max(8, (hudLabelPx * 3) / 4);
+    previewBlockPx = (previewBlockPx & ~1); // even pixels for crisp scaling
+
+    // Compute occupied bounds for the NEXT piece so we size by actual content.
+    int minX = PIECE_BLOCKS, minY = PIECE_BLOCKS;
+    int maxX = -1, maxY = -1;
+    for (int i = 0; i < PIECE_BLOCKS; i++) {
+        for (int j = 0; j < PIECE_BLOCKS; j++) {
+            int t = pieces.GetBlockType(game.NextPiece(), game.NextRotation(), j, i);
+            if (t == 0)
+                continue;
+            minX = std::min(minX, i);
+            minY = std::min(minY, j);
+            maxX = std::max(maxX, i);
+            maxY = std::max(maxY, j);
+        }
+    }
+
+    const int occWBlocks = (maxX >= 0) ? (maxX - minX + 1) : 0;
+    const int occHBlocks = (maxY >= 0) ? (maxY - minY + 1) : 0;
+    const int nextPreviewW = occWBlocks * previewBlockPx;
+    const int nextPreviewH = occHBlocks * previewBlockPx;
+
+    // Content-based sizing:
+    // - SCORE is stable-width
+    // - FACE and NEXT are forced to be identical size
+    // - SCORE width equals (FACE + gap + NEXT)
+    const int availW = screenW - (kMargin * 2);
+
+    const int scoreNeedW =
+        r.MeasureTextWidth("999999", hudValuePx) + (padX * 2);
+    const int faceNeedW =
+        std::max(r.MeasureTextWidth("FACE", hudLabelPx),
+                 r.MeasureTextWidth("4/4", hudValuePx)) +
+        (padX * 2);
+    const int nextNeedW =
+        std::max(r.MeasureTextWidth("NEXT", hudLabelPx), nextPreviewW) +
+        (padX * 2);
+
+    const int faceNeedH = topPad + hudLabelPx + labelGap + hudValuePx + bottomPad;
+    const int nextNeedH =
+        topPad + hudLabelPx + labelGap + nextPreviewH + bottomPad;
+
+    // Small panels share size (width + height).
+    int smallW = std::max(faceNeedW, nextNeedW);
+    int smallH = std::max(faceNeedH, nextNeedH);
+
+    // Ensure SCORE width is stable and equals (FACE + gap + NEXT).
+    // Choose smallW large enough for both content and score digits.
+    if (kGap < availW) {
+        int fromScore = (scoreNeedW > kGap) ? ((scoreNeedW - kGap + 1) / 2) : 0;
+        smallW = std::max(smallW, fromScore);
+    }
+
+    if (kGap < availW) {
+        int maxSmallW = (availW - kGap) / 2;
+        if (smallW > maxSmallW) {
+            // Screen too narrow: clamp widths, then shrink NEXT preview to fit.
+            smallW = std::max(0, maxSmallW);
+
+            const int maxPreviewWInner = std::max(0, smallW - (padX * 2));
+            int fitBlock = (occWBlocks > 0) ? (maxPreviewWInner / occWBlocks) : 0;
+            fitBlock = std::max(6, fitBlock);
+            fitBlock = (fitBlock & ~1);
+            previewBlockPx = std::min(previewBlockPx, fitBlock);
+        }
+    }
+
+    const int faceW = smallW;
+    const int nextW = smallW;
+    const int faceH = smallH;
+    const int nextH = smallH;
+
+    int scoreW = kGap + (2 * smallW);
+    scoreW = std::min(scoreW, availW);
+
+    // SCORE is slightly taller so it doesn't look cramped.
+    const int scoreBaseH = topPad + hudLabelPx + labelGap + hudValuePx + bottomPad;
+    const int scoreExtraH = std::max(4, hudLabelPx / 2);
+    const int scoreH = std::max(scoreBaseH + scoreExtraH, smallH + 2);
+
+    // Layout:
+    // Row 1: SCORE (top-right)
+    // Row 2: FACE then NEXT (same size)
     const int x2 = screenW - kMargin;
-    const int x1 = x2 - kBoxW;
+    const int scoreX2 = x2;
+    const int scoreX1 = scoreX2 - scoreW;
     const int scoreY1 = kMargin;
-    const int scoreY2 = scoreY1 + kScoreBoxH;
-    const int nextY1 = scoreY2 + kGap;
-    const int nextY2 = nextY1 + kNextBoxH;
-    const int faceY1 = nextY2 + kGap;
-    const int faceY2 = faceY1 + kFaceBoxH;
+    const int scoreY2 = scoreY1 + scoreH;
 
-    r.DrawRectangle(x1, scoreY1, x2, scoreY2, RenderColor::DarkGray);
-    r.DrawRectangle(x1, nextY1, x2, nextY2, RenderColor::DarkGray);
-    r.DrawRectangle(x1, faceY1, x2, faceY2, RenderColor::DarkGray);
+    const int row2Y1 = scoreY2 + kGap;
+    const int row2Y2 = row2Y1 + nextH;
 
-    // Borders.
-    r.DrawRectangle(x1, scoreY1, x2, scoreY1 + 1, RenderColor::LightGray);
-    r.DrawRectangle(x1, scoreY2 - 1, x2, scoreY2, RenderColor::LightGray);
-    r.DrawRectangle(x1, scoreY1, x1 + 1, scoreY2, RenderColor::LightGray);
-    r.DrawRectangle(x2 - 1, scoreY1, x2, scoreY2, RenderColor::LightGray);
+    const int faceX1 = scoreX1;
+    const int faceX2 = faceX1 + faceW;
+    const int nextX1 = faceX2 + kGap;
+    const int nextX2 = nextX1 + nextW;
 
-    r.DrawRectangle(x1, nextY1, x2, nextY1 + 1, RenderColor::LightGray);
-    r.DrawRectangle(x1, nextY2 - 1, x2, nextY2, RenderColor::LightGray);
-    r.DrawRectangle(x1, nextY1, x1 + 1, nextY2, RenderColor::LightGray);
-    r.DrawRectangle(x2 - 1, nextY1, x2, nextY2, RenderColor::LightGray);
+    auto DrawPanel = [&](int x1, int y1, int x2, int y2) {
+        r.DrawRectangle(x1, y1, x2, y2, RenderColor::DarkGray);
+        r.DrawRectangle(x1, y1, x2, y1 + 1, RenderColor::LightGray);
+        r.DrawRectangle(x1, y2 - 1, x2, y2, RenderColor::LightGray);
+        r.DrawRectangle(x1, y1, x1 + 1, y2, RenderColor::LightGray);
+        r.DrawRectangle(x2 - 1, y1, x2, y2, RenderColor::LightGray);
+    };
 
-    r.DrawRectangle(x1, faceY1, x2, faceY1 + 1, RenderColor::LightGray);
-    r.DrawRectangle(x1, faceY2 - 1, x2, faceY2, RenderColor::LightGray);
-    r.DrawRectangle(x1, faceY1, x1 + 1, faceY2, RenderColor::LightGray);
-    r.DrawRectangle(x2 - 1, faceY1, x2, faceY2, RenderColor::LightGray);
+    DrawPanel(scoreX1, scoreY1, scoreX2, scoreY2);
+    DrawPanel(faceX1, row2Y1, faceX2, row2Y2);
+    DrawPanel(nextX1, row2Y1, nextX2, row2Y2);
 
     const char *scoreLabel = "SCORE";
-    const int scoreLabelSize = 16;
-    const int scoreValueSize = 32;
-    int scoreLabelW = r.MeasureTextWidth(scoreLabel, scoreLabelSize);
-    int scoreLabelX = x1 + (kBoxW - scoreLabelW) / 2;
-    r.DrawText(scoreLabelX, scoreY1 + 8, scoreLabel, scoreLabelSize,
+    int scoreLabelW = r.MeasureTextWidth(scoreLabel, hudLabelPx);
+    int scoreLabelX = scoreX1 + (scoreW - scoreLabelW) / 2;
+    int scoreLabelY = scoreY1 + topPad;
+    r.DrawText(scoreLabelX, scoreLabelY, scoreLabel, hudLabelPx,
                RenderColor::White);
 
     char buf[64];
     std::snprintf(buf, sizeof(buf), "%d", game.Score());
-    int scoreValueW = r.MeasureTextWidth(buf, scoreValueSize);
-    int scoreValueX = x1 + (kBoxW - scoreValueW) / 2;
-    r.DrawText(scoreValueX, scoreY1 + 26, buf, scoreValueSize,
+    int scoreValueW = r.MeasureTextWidth(buf, hudValuePx);
+    int scoreValueX = scoreX1 + (scoreW - scoreValueW) / 2;
+    int scoreValueY = scoreLabelY + hudLabelPx + labelGap;
+    r.DrawText(scoreValueX, scoreValueY, buf, hudValuePx,
                RenderColor::Yellow);
 
     const char *nextLabel = "NEXT";
-    const int nextLabelSize = 16;
-    int nextLabelW = r.MeasureTextWidth(nextLabel, nextLabelSize);
-    int nextLabelX = x1 + (kBoxW - nextLabelW) / 2;
-    r.DrawText(nextLabelX, nextY1 + 8, nextLabel, nextLabelSize,
+    int nextLabelW = r.MeasureTextWidth(nextLabel, hudLabelPx);
+    int nextLabelX = nextX1 + (nextW - nextLabelW) / 2;
+    int nextLabelY = row2Y1 + topPad;
+    r.DrawText(nextLabelX, nextLabelY, nextLabel, hudLabelPx,
                RenderColor::White);
 
-    static const int kPreviewBlock = 12;
-    static const int kPreviewPad = 8;
-    const int boxInnerX1 = x1 + kPreviewPad;
-    const int boxInnerX2 = x2 - kPreviewPad;
-    const int boxInnerY1 = nextY1 + 26;
-    const int boxInnerY2 = nextY2 - kPreviewPad;
+    const int boxInnerX1 = nextX1 + padX;
+    const int boxInnerX2 = nextX2 - padX;
+    const int boxInnerY1 = nextLabelY + hudLabelPx + labelGap;
+    const int boxInnerY2 = row2Y2 - bottomPad;
 
-    const int previewW = PIECE_BLOCKS * kPreviewBlock;
-    const int previewH = PIECE_BLOCKS * kPreviewBlock;
-    const int previewX0 =
-        boxInnerX1 + ((boxInnerX2 - boxInnerX1) - previewW) / 2;
-    const int previewY0 =
-        boxInnerY1 + ((boxInnerY2 - boxInnerY1) - previewH) / 2;
+    const int previewCenterX = (boxInnerX1 + boxInnerX2) / 2;
+    const int previewCenterY = (boxInnerY1 + boxInnerY2) / 2;
 
+    // Center the NEXT piece by occupied bounds (not the 5x5 grid).
+    int originX = previewCenterX;
+    int originY = previewCenterY;
+    if (occWBlocks > 0 && occHBlocks > 0) {
+        const int occW = occWBlocks * previewBlockPx;
+        const int occH = occHBlocks * previewBlockPx;
+        originX = previewCenterX - (occW / 2) - (minX * previewBlockPx);
+        originY = previewCenterY - (occH / 2) - (minY * previewBlockPx);
+    }
+
+    RenderColor nextColor = PieceRenderColorForKind(game.NextPiece());
     for (int i = 0; i < PIECE_BLOCKS; i++) {
         for (int j = 0; j < PIECE_BLOCKS; j++) {
-            int t = pieces.GetBlockType(game.NextPiece(), game.NextRotation(),
-                                        j, i);
+            int t = pieces.GetBlockType(game.NextPiece(), game.NextRotation(), j, i);
             if (t == 0)
                 continue;
 
-            RenderColor c = PieceRenderColorForKind(game.NextPiece());
-            const int xA = previewX0 + i * kPreviewBlock;
-            const int yA = previewY0 + j * kPreviewBlock;
-            r.DrawRectangle(xA + 1, yA + 1, xA + kPreviewBlock - 2,
-                            yA + kPreviewBlock - 2, c);
+            const int xA = originX + i * previewBlockPx;
+            const int yA = originY + j * previewBlockPx;
+            r.DrawRectangle(xA + 1, yA + 1, xA + previewBlockPx - 2,
+                            yA + previewBlockPx - 2, nextColor);
         }
     }
 
     const char *faceLabel = "FACE";
-    const int faceLabelSize = 16;
-    int faceLabelW = r.MeasureTextWidth(faceLabel, faceLabelSize);
-    int faceLabelX = x1 + (kBoxW - faceLabelW) / 2;
-    r.DrawText(faceLabelX, faceY1 + 8, faceLabel, faceLabelSize,
+    int faceLabelW = r.MeasureTextWidth(faceLabel, hudLabelPx);
+    int faceLabelX = faceX1 + (faceW - faceLabelW) / 2;
+    int faceLabelY = row2Y1 + topPad;
+    r.DrawText(faceLabelX, faceLabelY, faceLabel, hudLabelPx,
                RenderColor::White);
 
     std::snprintf(buf, sizeof(buf), "%d/4", board.ActiveFace() + 1);
-    const int faceValueSize = 24;
-    int faceValueW = r.MeasureTextWidth(buf, faceValueSize);
-    int faceValueX = x1 + (kBoxW - faceValueW) / 2;
-    r.DrawText(faceValueX, faceY1 + 26, buf, faceValueSize,
+    int faceValueW = r.MeasureTextWidth(buf, hudValuePx);
+    int faceValueX = faceX1 + (faceW - faceValueW) / 2;
+    int faceValueY = faceLabelY + hudLabelPx + labelGap;
+    r.DrawText(faceValueX, faceValueY, buf, hudValuePx,
                RenderColor::White);
 }
