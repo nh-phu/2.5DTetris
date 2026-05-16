@@ -15,6 +15,7 @@ static const int kLockDelayMs = 500;
 
 // Classic line clear pause.
 static const int kLineClearPauseMs = 500;
+static const int kClearAnimMs = 333;
 
 // Score threshold for cube rotation.
 static const int kRotateEveryScore = 500;
@@ -113,6 +114,9 @@ void Game::Reset(std::uint32_t seed)
     mPendingRotateSteps = 0;
     mGameOver = false;
     mHasActivePiece = true;
+    mClearRows.clear();
+    mClearStep = 0;
+    mClearAnimMs = 0;
 
     // Ensure first NextPieceFromBag() refills deterministically.
     mBagPos = (int)mBag.size();
@@ -303,20 +307,15 @@ void Game::LandPiece()
     mBoard.StorePiece(mPosX, mPosY, mPiece, mRotation);
     mHasActivePiece = false;
 
-    auto ClearCascades = [&]() -> int {
-        int total = 0;
-        while (true) {
-            int c = mBoard.DeletePossibleLines();
-            if (c <= 0)
-                break;
-            total += c;
-        }
-        return total;
-    };
-
-    // Resolve clears (cascades)
-    int clearedTotal = ClearCascades();
-    mScore += ScoreForLines(clearedTotal);
+    // Detect full rows before deleting; animate then delete.
+    mClearRows = mBoard.FindFullRowsAnyFace();
+    mClearStep = 0;
+    mClearAnimMs = 0;
+    if (!mClearRows.empty()) {
+        mPauseMs = kClearAnimMs;
+        mPendingSpawn = true;
+        return;
+    }
 
     // Queue score-based rotations, but do not apply them yet. We want to pause
     // after landing so the player can see the score/board update.
@@ -351,30 +350,56 @@ void Game::Tick(int deltaMs)
     // Pause (e.g. after line clear): freeze game simulation.
     if (mPauseMs > 0) {
         mPauseMs -= deltaMs;
+        if (!mClearRows.empty()) {
+            mClearAnimMs += deltaMs;
+            const int pairs = BOARD_WIDTH / 2;
+            int step = (mClearAnimMs * (pairs + 1)) / kClearAnimMs;
+            if (step < 0)
+                step = 0;
+            if (step > pairs)
+                step = pairs;
+            mClearStep = step;
+        }
+
         if (mPauseMs <= 0) {
             mPauseMs = 0;
 
+            // Resolve pending clear after the animation.
+            if (!mClearRows.empty()) {
+                mBoard.DeleteRows(mClearRows);
+                mScore += ScoreForLines((int)mClearRows.size());
+                while (mScore >= mNextRotateAt) {
+                    mPendingRotateSteps++;
+                    AdvanceNextRotateAt();
+                }
+                mClearRows.clear();
+                mClearStep = 0;
+                mClearAnimMs = 0;
+
+                // If clears created new full rows, animate again.
+                mClearRows = mBoard.FindFullRowsAnyFace();
+                if (!mClearRows.empty()) {
+                    mPauseMs = kClearAnimMs;
+                    mPendingSpawn = true;
+                    return;
+                }
+            }
+
             // Apply any pending score rotations after the post-land pause.
             if (mPendingRotateSteps > 0) {
-                auto ClearCascades = [&]() -> int {
-                    int total = 0;
-                    while (true) {
-                        int c = mBoard.DeletePossibleLines();
-                        if (c <= 0)
-                            break;
-                        total += c;
-                    }
-                    return total;
-                };
-
-                int clearedTotal = 0;
                 while (mPendingRotateSteps > 0) {
                     mBoard.RotateCW();
                     mPendingRotateSteps--;
 
-                    int rotatedClears = ClearCascades();
-                    clearedTotal += rotatedClears;
-                    mScore += ScoreForLines(rotatedClears);
+                    std::vector<int> rows = mBoard.FindFullRowsAnyFace();
+                    if (!rows.empty()) {
+                        mClearRows = rows;
+                        mClearStep = 0;
+                        mClearAnimMs = 0;
+                        mPauseMs = kClearAnimMs;
+                        mPendingSpawn = true;
+                        return;
+                    }
 
                     // Rotation clears can raise score enough to queue
                     // additional rotations.
@@ -389,12 +414,6 @@ void Game::Tick(int deltaMs)
                     return;
                 }
 
-                // If rotated clears happened, pause again before spawning.
-                if (clearedTotal > 0) {
-                    mPauseMs = kLineClearPauseMs;
-                    mPendingSpawn = true;
-                    return;
-                }
             }
 
             if (mPendingSpawn) {

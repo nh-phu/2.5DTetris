@@ -3,6 +3,8 @@
 
 #include "pieces.h"
 
+#include <vector>
+
 #define BOARD_LINE_WIDTH                                                       \
     6                 // Width of each of the two lines that delimit the board
 #define BLOCK_SIZE 16 // Width and Height of each block of a piece
@@ -43,8 +45,9 @@ class Board {
     // Deletes rows that are complete on any face; deletion applies to all
     // faces.
     int DeletePossibleLines();
+    std::vector<int> FindFullRowsAnyFace() const;
+    void DeleteRows(const std::vector<int> &rows);
     bool IsGameOver() const;
-    // Rotate the active face 90 degrees clockwise.
     void RotateCW();
 
     int ActiveFace() const { return mActiveFace; }

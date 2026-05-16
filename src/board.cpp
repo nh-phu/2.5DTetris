@@ -153,6 +153,61 @@ int Board::DeletePossibleLines()
     return cleared;
 }
 
+std::vector<int> Board::FindFullRowsAnyFace() const
+{
+    std::vector<int> rows;
+    for (int y = 0; y < BOARD_HEIGHT; y++) {
+        bool anyFaceFull = false;
+        for (int face = 0; face < 4 && !anyFaceFull; face++) {
+            int x = 0;
+            while (x < BOARD_WIDTH) {
+                if (At(face, x, y) == 0)
+                    break;
+                x++;
+            }
+            if (x == BOARD_WIDTH)
+                anyFaceFull = true;
+        }
+
+        if (anyFaceFull)
+            rows.push_back(y);
+    }
+    return rows;
+}
+
+void Board::DeleteRows(const std::vector<int> &rows)
+{
+    if (rows.empty())
+        return;
+
+    std::vector<bool> deleteRow(BOARD_HEIGHT, false);
+    for (int y : rows) {
+        if (y < 0 || y >= BOARD_HEIGHT)
+            continue;
+        deleteRow[(std::size_t)y] = true;
+    }
+
+    int newRing[RING_WIDTH][BOARD_HEIGHT];
+    for (int rx = 0; rx < RING_WIDTH; rx++) {
+        for (int y = 0; y < BOARD_HEIGHT; y++)
+            newRing[rx][y] = 0;
+    }
+
+    int writeY = BOARD_HEIGHT - 1;
+    for (int y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (deleteRow[(std::size_t)y])
+            continue;
+        for (int rx = 0; rx < RING_WIDTH; rx++)
+            newRing[rx][writeY] = mRing[rx][y];
+        writeY--;
+    }
+
+    for (int rx = 0; rx < RING_WIDTH; rx++) {
+        for (int y = 0; y < BOARD_HEIGHT; y++)
+            mRing[rx][y] = newRing[rx][y];
+    }
+}
+
 /*
 ======================================
 Returns 1 (true) if the this block of the board is empty, 0 if it is filled

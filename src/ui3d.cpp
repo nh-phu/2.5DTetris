@@ -134,9 +134,25 @@ static Color RayColorForKind(int kind)
     RGBA8 c = PieceRGBAForKind(kind);
     return {c.r, c.g, c.b, c.a};
 }
+
+static bool ShouldHideCell(const Game &game, int x, int y)
+{
+    if (!game.IsClearingLines())
+        return false;
+    const std::vector<int> &rows = game.ClearRows();
+    for (int ry : rows) {
+        if (ry != y)
+            continue;
+        int pairs = BOARD_WIDTH / 2;
+        int dist = std::min(std::abs(x - (pairs - 1)), std::abs(x - pairs));
+        return dist < game.ClearStep();
+    }
+    return false;
+}
 } // namespace
 
-void UI3D::DrawRotate(const Board &board, int fromFace, float angleDeg)
+void UI3D::DrawRotate(const Board &board, const Game &game, int fromFace,
+                      float angleDeg)
 {
     // Simple cube-turn visualization: draw filled blocks on the surfaces.
     // Important: this board is a ring where adjacent faces share edge columns.
@@ -183,6 +199,8 @@ void UI3D::DrawRotate(const Board &board, int fromFace, float angleDeg)
             for (int x = 1; x <= BOARD_WIDTH - 2; x++) {
                 if (board.IsFreeBlock(face, x, y))
                     continue;
+                if (ShouldHideCell(game, x, y))
+                    continue;
 
                 Color c = RayColorForKind(board.BlockKind(face, x, y));
 
@@ -217,6 +235,8 @@ void UI3D::DrawRotate(const Board &board, int fromFace, float angleDeg)
 
         for (int y = 0; y < BOARD_HEIGHT; y++) {
             if (board.IsFreeBlock(face, BOARD_WIDTH - 1, y))
+                continue;
+            if (ShouldHideCell(game, BOARD_WIDTH - 1, y))
                 continue;
 
             Color c =
@@ -324,6 +344,8 @@ void UI3D::DrawActiveFace(const Board &board, const Pieces &pieces,
     for (int y = 0; y < BOARD_HEIGHT; y++) {
         for (int x = 0; x < BOARD_WIDTH; x++) {
             if (board.IsFreeBlock(face, x, y))
+                continue;
+            if (ShouldHideCell(game, x, y))
                 continue;
 
             Color c = RayColorForKind(board.BlockKind(face, x, y));

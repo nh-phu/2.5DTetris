@@ -104,7 +104,7 @@ int main(int argc, char **argv)
             float t = (float)anim.elapsedMs / (float)anim.durationMs;
             float e = EaseInOut(t);
             float angle = e * 90.0f;
-            UI3D::DrawRotate(mBoard, anim.stepFromFace, angle);
+            UI3D::DrawRotate(mBoard, mGame, anim.stepFromFace, angle);
             UI::DrawHud(renderer, mBoard, mPieces, mGame);
 
             renderer.EndFrame();
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
             if (anim.active) {
                 // Avoid a 1-frame "blink" to the new face before the rotation
                 // animation starts.
-                UI3D::DrawRotate(mBoard, anim.stepFromFace, 0.0f);
+                UI3D::DrawRotate(mBoard, mGame, anim.stepFromFace, 0.0f);
             } else {
                 UI3D::DrawActiveFace(mBoard, mPieces, mGame);
             }

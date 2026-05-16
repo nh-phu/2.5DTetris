@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <random>
+#include <vector>
 
 // Game logic + state (no rendering / no input backend).
 class Game {
@@ -32,6 +33,10 @@ class Game {
     bool IsPaused() const { return mPauseMs > 0; }
     bool HasActivePiece() const { return mHasActivePiece; }
     int Score() const { return mScore; }
+
+    bool IsClearingLines() const { return !mClearRows.empty(); }
+    int ClearStep() const { return mClearStep; }
+    const std::vector<int> &ClearRows() const { return mClearRows; }
 
     int ActiveX() const { return mPosX; }
     int ActiveY() const { return mPosY; }
@@ -88,6 +93,10 @@ class Game {
     bool mHasActivePiece;
 
     bool mGameOver;
+
+    std::vector<int> mClearRows;
+    int mClearStep;
+    int mClearAnimMs;
 
     void RefillBag();
     int NextPieceFromBag();

@@ -15,7 +15,8 @@ class UI {
                         const Game &game);
 
   private:
-    static void DrawBoard(Renderer &r, const Board &board, int screenHeight);
+    static void DrawBoard(Renderer &r, const Board &board, const Game &game,
+                          int screenHeight);
     static void DrawPiece(Renderer &r, const Board &board, const Pieces &pieces,
                           int x, int y, int piece, int rotation);
 };

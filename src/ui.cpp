@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <vector>
 
 void UI::DrawPiece(Renderer &r, const Board &board, const Pieces &pieces, int x,
                    int y, int piece, int rotation)
@@ -28,7 +29,8 @@ void UI::DrawPiece(Renderer &r, const Board &board, const Pieces &pieces, int x,
     }
 }
 
-void UI::DrawBoard(Renderer &r, const Board &board, int screenHeight)
+void UI::DrawBoard(Renderer &r, const Board &board, const Game &game,
+                   int screenHeight)
 {
     int x1 = BOARD_POSITION - (BLOCK_SIZE * (BOARD_WIDTH / 2)) - 1;
     int x2 = BOARD_POSITION + (BLOCK_SIZE * (BOARD_WIDTH / 2));
@@ -45,11 +47,28 @@ void UI::DrawBoard(Renderer &r, const Board &board, int screenHeight)
         for (int j = 0; j < BOARD_HEIGHT; j++) {
             int kind = board.BlockKind(i, j);
             if (kind >= 0)
+            {
+                bool skip = false;
+                if (game.IsClearingLines()) {
+                    const std::vector<int> &rows = game.ClearRows();
+                    for (int ry : rows) {
+                        if (ry == j) {
+                            int pairs = BOARD_WIDTH / 2;
+                            int dist = std::min(std::abs(i - (pairs - 1)),
+                                                std::abs(i - pairs));
+                            if (dist < game.ClearStep())
+                                skip = true;
+                            break;
+                        }
+                    }
+                }
+                if (!skip)
                 r.DrawRectangle(x1 + i * BLOCK_SIZE + kPad,
                                 y + j * BLOCK_SIZE + kPad,
                                 (x1 + i * BLOCK_SIZE) + BLOCK_SIZE - 1 - kPad,
                                 (y + j * BLOCK_SIZE) + BLOCK_SIZE - 1 - kPad,
                                 PieceRenderColorForKind(kind));
+            }
         }
     }
 }
@@ -57,7 +76,7 @@ void UI::DrawBoard(Renderer &r, const Board &board, int screenHeight)
 void UI::Draw(Renderer &r, const Board &board, const Pieces &pieces,
               const Game &game, int screenHeight)
 {
-    DrawBoard(r, board, screenHeight);
+    DrawBoard(r, board, game, screenHeight);
     DrawPiece(r, board, pieces, game.ActiveX(), game.ActiveY(),
               game.ActivePiece(), game.ActiveRotation());
 

@@ -8,7 +8,8 @@
 namespace UI3D
 {
 void DrawActiveFace(const Board &board, const Pieces &pieces, const Game &game);
-void DrawRotate(const Board &board, int fromFace, float angleDeg);
+void DrawRotate(const Board &board, const Game &game, int fromFace,
+                float angleDeg);
 void Shutdown();
 }
 
