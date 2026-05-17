@@ -4,7 +4,21 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <vector>
+
+bool UI::ShouldHideCell(const Game &game, int x, int y)
+{
+    if (!game.IsClearingLines())
+        return false;
+    const std::vector<int> &rows = game.ClearRows();
+    for (int ry : rows) {
+        if (ry != y)
+            continue;
+        int pairs = BOARD_WIDTH / 2;
+        int dist = std::min(std::abs(x - (pairs - 1)), std::abs(x - pairs));
+        return dist < game.ClearStep();
+    }
+    return false;
+}
 
 void UI::DrawPiece(Renderer &r, const Board &board, const Pieces &pieces, int x,
                    int y, int piece, int rotation)
@@ -46,28 +60,13 @@ void UI::DrawBoard(Renderer &r, const Board &board, const Game &game,
     for (int i = 0; i < BOARD_WIDTH; i++) {
         for (int j = 0; j < BOARD_HEIGHT; j++) {
             int kind = board.BlockKind(i, j);
-            if (kind >= 0)
-            {
-                bool skip = false;
-                if (game.IsClearingLines()) {
-                    const std::vector<int> &rows = game.ClearRows();
-                    for (int ry : rows) {
-                        if (ry == j) {
-                            int pairs = BOARD_WIDTH / 2;
-                            int dist = std::min(std::abs(i - (pairs - 1)),
-                                                std::abs(i - pairs));
-                            if (dist < game.ClearStep())
-                                skip = true;
-                            break;
-                        }
-                    }
-                }
-                if (!skip)
-                r.DrawRectangle(x1 + i * BLOCK_SIZE + kPad,
-                                y + j * BLOCK_SIZE + kPad,
-                                (x1 + i * BLOCK_SIZE) + BLOCK_SIZE - 1 - kPad,
-                                (y + j * BLOCK_SIZE) + BLOCK_SIZE - 1 - kPad,
-                                PieceRenderColorForKind(kind));
+            if (kind >= 0) {
+                if (!ShouldHideCell(game, i, j))
+                    r.DrawRectangle(x1 + i * BLOCK_SIZE + kPad,
+                                    y + j * BLOCK_SIZE + kPad,
+                                    (x1 + i * BLOCK_SIZE) + BLOCK_SIZE - 1 - kPad,
+                                    (y + j * BLOCK_SIZE) + BLOCK_SIZE - 1 - kPad,
+                                    PieceRenderColorForKind(kind));
             }
         }
     }

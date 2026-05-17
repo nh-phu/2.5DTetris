@@ -1,5 +1,7 @@
 #include "pieces.h"
 
+namespace
+{
 char mPieces[7 /*kind */][4 /* rotation */][5 /* horizontal blocks */]
             [5 /* vertical blocks */] = {
                 // Square
@@ -169,6 +171,7 @@ int mPiecesInitialPosition[7 /*kind */][4 /* rotation */][2 /* position */] = {
     /* T */
     {{-2, -3}, {-2, -3}, {-2, -3}, {-2, -2}},
 };
+} // namespace
 
 /*
 ======================================

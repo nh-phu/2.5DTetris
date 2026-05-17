@@ -128,28 +128,9 @@ Delete all the lines that should be removed
 */
 int Board::DeletePossibleLines()
 {
-    int cleared = 0;
-    for (int y = 0; y < BOARD_HEIGHT; y++) {
-        bool anyFaceFull = false;
-        for (int face = 0; face < 4 && !anyFaceFull; face++) {
-            int x = 0;
-            while (x < BOARD_WIDTH) {
-                if (At(face, x, y) == 0)
-                    break;
-                x++;
-            }
-            if (x == BOARD_WIDTH)
-                anyFaceFull = true;
-        }
-
-        if (anyFaceFull) {
-            DeleteLine(y);
-            cleared++;
-
-            y--;
-        }
-    }
-
+    std::vector<int> rows = FindFullRowsAnyFace();
+    int cleared = (int)rows.size();
+    DeleteRows(rows);
     return cleared;
 }
 
