@@ -11,8 +11,6 @@ class UI {
     static void Draw(Renderer &r, const Board &board, const Pieces &pieces,
                      const Game &game, int screenHeight);
 
-    static bool ShouldHideCell(const Game &game, int x, int y);
-
     static void DrawHud(Renderer &r, const Board &board, const Pieces &pieces,
                         const Game &game);
 

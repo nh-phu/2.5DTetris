@@ -22,12 +22,15 @@ static float EaseInOut(float t)
 int main(int argc, char **argv)
 {
     bool rotateDemo = false;
+    bool debug2D = false;
 
     // Very small arg parser.
     // Usage: ./tetris --rotate-demo
     for (int i = 1; i < argc; i++) {
         if (argv[i] && std::strcmp(argv[i], "--rotate-demo") == 0)
             rotateDemo = true;
+        if (argv[i] && std::strcmp(argv[i], "--debug-2d") == 0)
+            debug2D = true;
     }
 
     Platform platform;
@@ -104,8 +107,12 @@ int main(int argc, char **argv)
             float t = (float)anim.elapsedMs / (float)anim.durationMs;
             float e = EaseInOut(t);
             float angle = e * 90.0f;
-            UI3D::DrawRotate(mBoard, mGame, anim.stepFromFace, angle);
-            UI::DrawHud(renderer, mBoard, mPieces, mGame);
+            if (debug2D) {
+                UI::Draw(renderer, mBoard, mPieces, mGame, mScreenHeight);
+            } else {
+                UI3D::DrawRotate(mBoard, mGame, anim.stepFromFace, angle);
+                UI::DrawHud(renderer, mBoard, mPieces, mGame);
+            }
 
             renderer.EndFrame();
 
@@ -146,14 +153,18 @@ int main(int argc, char **argv)
             // ----- Draw -----
             renderer.BeginFrame();
             renderer.Clear(RenderColor::Black);
-            if (anim.active) {
-                // Avoid a 1-frame "blink" to the new face before the rotation
-                // animation starts.
-                UI3D::DrawRotate(mBoard, mGame, anim.stepFromFace, 0.0f);
+            if (debug2D) {
+                UI::Draw(renderer, mBoard, mPieces, mGame, mScreenHeight);
             } else {
-                UI3D::DrawActiveFace(mBoard, mPieces, mGame);
+                if (anim.active) {
+                    // Avoid a 1-frame "blink" to the new face before the rotation
+                    // animation starts.
+                    UI3D::DrawRotate(mBoard, mGame, anim.stepFromFace, 0.0f);
+                } else {
+                    UI3D::DrawActiveFace(mBoard, mPieces, mGame);
+                }
+                UI::DrawHud(renderer, mBoard, mPieces, mGame);
             }
-            UI::DrawHud(renderer, mBoard, mPieces, mGame);
             renderer.EndFrame();
         }
     }

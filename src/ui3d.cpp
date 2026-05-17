@@ -1,7 +1,6 @@
 #include "ui3d.h"
 
 #include "piece_colors.h"
-#include "ui.h"
 
 #include <raylib.h>
 #include <rlgl.h>
@@ -138,7 +137,17 @@ static Color RayColorForKind(int kind)
 
 static bool ShouldHideCell(const Game &game, int x, int y)
 {
-    return UI::ShouldHideCell(game, x, y);
+    if (!game.IsClearingLines())
+        return false;
+    const std::vector<int> &rows = game.ClearRows();
+    for (int ry : rows) {
+        if (ry != y)
+            continue;
+        int pairs = BOARD_WIDTH / 2;
+        int dist = std::min(std::abs(x - (pairs - 1)), std::abs(x - pairs));
+        return dist < game.ClearStep();
+    }
+    return false;
 }
 } // namespace
 
